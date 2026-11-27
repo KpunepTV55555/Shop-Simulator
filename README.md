@@ -985,4 +985,135 @@ function draw(){
   }}
 (function loop(t){const dt=Math.min(.1,(t-last)/1000);last=t;if(!paused)update(dt);draw();requestAnimationFrame(loop)})(performance.now());
 menuRender();
-</script></body></html>
+</script><script>
+(()=>{
+const SUPA_URL='ВСТАВЬТЕ_PROJECT_URL',SUPA_KEY='ВСТАВЬТЕ_ANON_PUBLIC_KEY';
+const ok_=!SUPA_URL.startsWith('ВСТАВЬТЕ');
+const rpc=async(f,b)=>{const r=await fetch(SUPA_URL+'/rest/v1/rpc/'+f,{method:'POST',headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify(b)});if(!r.ok)throw 0;return r.json()};
+const hp=async(u,p)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('shopsim:'+u.toLowerCase()+':'+p)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const loc=()=>{try{return JSON.parse(localStorage.getItem('shoploc'))||{}}catch(e){return{}}};
+let ses=null;try{ses=JSON.parse(localStorage.getItem('shopacc'))}catch(e){}
+const online=()=>ses&&!ses.local&&ok_;
+const lh=v=>typeof v=='string'?{h:v,dn:''}:(v||{});
+const stats=()=>({ach:[...ach],rec:{...rec},skin:localStorage.getItem('shopskin'),dn:ses&&ses.dn});
+function merge(s){let ch=false;s=s||{};
+ (s.ach||[]).forEach(id=>{if(!ach.has(id)&&ACHS.some(a=>a.id==id)){ach.add(id);ch=true}});
+ for(const m in rec){const v=s.rec&&s.rec[m];if(typeof v=='number'&&v>0&&(!(rec[m]>0)||v<rec[m])){rec[m]=v;ch=true}}
+ if(s.skin&&!localStorage.getItem('shopskin')){try{localStorage.setItem('shopskin',s.skin)}catch(e){}ch=true}
+ if(ch){try{saveAch();localStorage.setItem('shoprec',JSON.stringify(rec))}catch(e){}}return ch}
+let tm_;const push=()=>{if(!online())return;clearTimeout(tm_);tm_=setTimeout(()=>rpc('acc_save',{u:ses.u,p:ses.h,s:stats()}).catch(()=>{}),800)};
+const _sa=window.saveAch,_rw=window.recWin,_mr=window.menuRender;
+window.menuRender=function(){_mr();push()};
+window.saveAch=function(){_sa();push()};window.recWin=function(){_rw();push()};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)push()});
+if(online())rpc('acc_login',{u:ses.u,p:ses.h}).then(r=>{if(r.ok){const sd=r.stats&&r.stats.dn;if(typeof sd=='string'&&sd.toLowerCase()==ses.u&&sd!==ses.dn){ses.dn=sd;localStorage.setItem('shopacc',JSON.stringify(ses));updateNick()}if(merge(r.stats))location.reload();else push()}}).catch(()=>{});
+const E=(t,p,c)=>{const e=document.createElement(t);Object.assign(e,p||{});(c||[]).forEach(x=>e.append(x));return e};
+const ov=E('div');ov.style.cssText='display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:12px';
+const pn=E('div');pn.style.cssText='background:var(--bg);color:var(--fg);border-radius:14px;padding:18px;max-width:380px;width:100%;max-height:90vh;overflow:auto;text-align:left';
+ov.append(pn);document.body.append(ov);ov.onclick=e=>{if(e.target===ov)ov.style.display='none'};
+const fT=t=>{const m=Math.floor(t/60),q=(t%60).toFixed(2);return m+':'+(q.length<5?'0':'')+q};
+const inp=(ph,ty)=>{const i=E('input',{placeholder:ph,type:ty||'text'});i.style.cssText='width:100%;box-sizing:border-box;padding:9px;margin:4px 0;font-size:16px;border-radius:8px;border:1px solid #888';return i};
+function render(){updateNick();pn.textContent='';const msg=E('div');msg.style.cssText='min-height:20px;margin:6px 0;color:#d33';
+ pn.append(E('h3',{textContent:'👤 Аккаунт'}));
+ const w=E('div',{textContent:'⚠️ Создавайте аккаунт именно на сайте игры. Только такой аккаунт виден всем и работает на любом устройстве. Аккаунт, созданный вне сайта, хранится лишь на этом устройстве и найти его никто не сможет.'});
+ w.style.cssText='background:#fff3cd;color:#664d03;border-radius:8px;padding:8px;font-size:13px;margin-bottom:8px';pn.append(w);
+ if(ses){pn.append(E('div',{textContent:'Вы вошли как: '+(ses.dn||ses.u)}),E('div',{textContent:ses.local?'📴 Локальный аккаунт (только это устройство)':'🌐 Аккаунт на сайте (виден всем)'}),E('br'),E('button',{textContent:'✏️ Редактировать аккаунт',onclick:renderEdit}),' ',
+  E('button',{textContent:'Выйти',onclick:()=>{localStorage.removeItem('shopacc');ses=null;render()}}))}
+ else{const u=inp('Ник (3–16: буквы, цифры, _)'),p=inp('Пароль (от 6 символов)','password');
+  const go=async reg=>{msg.style.color='#d33';const n=u.value.trim(),nl=n.toLowerCase();
+   if(!/^[a-z0-9_а-яё]{3,16}$/i.test(n)||p.value.length<6){msg.textContent='Ник: 3–16 символов (буквы, цифры, _), пароль от 6.';return}
+   try{const h=await hp(n,p.value);let on=ok_,r;
+    if(ok_){try{if(reg){r=await rpc('acc_register',{u:nl,p:h});if(r.err){msg.textContent=r.err=='taken'?'Ник занят.':'Недопустимый ник.';return}}
+     r=await rpc('acc_login',{u:nl,p:h})}catch(e){on=false}}else on=false;
+    if(on){if(!r.ok){msg.textContent='Неверный ник или пароль.';return}
+     const sd=r.stats&&r.stats.dn;ses={u:nl,h,dn:(typeof sd=='string'&&sd.toLowerCase()==nl)?sd:n};localStorage.setItem('shopacc',JSON.stringify(ses));
+     const ch=merge(r.stats);await rpc('acc_save',{u:nl,p:h,s:stats()});if(ch)location.reload();else render()}
+    else{const L=loc();
+     if(reg){if(L[nl]){msg.textContent='Такой локальный ник уже есть.';return}L[nl]={h,dn:n,t:Date.now()};localStorage.setItem('shoploc',JSON.stringify(L))}
+     else if(lh(L[nl]).h!==h){msg.textContent='Неверный ник или пароль. Связи с сайтом нет, проверен только локальный аккаунт.';return}
+     ses={u:nl,h,local:true,dn:(reg?n:lh(L[nl]).dn)||n};localStorage.setItem('shopacc',JSON.stringify(ses));render();
+     const ww=E('div',{textContent:'⚠️ Связи с сайтом нет: создан/открыт ЛОКАЛЬНЫЙ аккаунт, он останется только на этом устройстве. Чтобы аккаунт был виден всем, создайте его на сайте игры.'});
+     ww.style.cssText='color:#d33;font-size:13px;margin-top:8px';pn.append(ww)}
+   }catch(e){msg.textContent='Ошибка. Попробуйте ещё раз.'}};
+  pn.append(u,p,E('div',{},[E('button',{textContent:'Войти',onclick:()=>go(false)}),' ',E('button',{textContent:'Создать аккаунт',onclick:()=>go(true)})]))}
+ pn.append(msg);
+ pn.append(E('div',{},[E('br'),E('button',{textContent:'Закрыть',onclick:()=>ov.style.display='none'})]))}
+function renderDel(){pn.textContent='';pn.append(E('h3',{textContent:'🗑️ Удаление аккаунта'}));
+ const w=E('div',{textContent:'⚠️ Внимание! Аккаунт «'+(ses.dn||ses.u)+'» будет удалён навсегда'+(ses.local?'':' с сайта')+': ник, ID и сохранённые в аккаунте достижения и рекорды пропадут, восстановить их будет нельзя. Ник освободится, и его сможет занять другой игрок. Прогресс, уже сохранённый в этом браузере, останется.'});
+ w.style.cssText='background:#f8d7da;color:#58151c;border-radius:8px;padding:8px;font-size:13px;margin-bottom:8px';
+ const cp=inp('Введите пароль для подтверждения','password'),msg=E('div');msg.style.cssText='min-height:20px;margin:6px 0;color:#d33';
+ const del=async()=>{try{if(await hp(ses.u,cp.value)!==ses.h){msg.textContent='Неверный пароль.';return}
+   if(ses.local){const L=loc();delete L[ses.u];localStorage.setItem('shoploc',JSON.stringify(L))}
+   else{const r=await rpc('acc_delete',{u:ses.u,p:ses.h});if(!r.ok){msg.textContent='Не удалось удалить аккаунт.';return}}
+   localStorage.removeItem('shopacc');ses=null;render();pn.append(E('div',{textContent:'Аккаунт удалён.'}))
+  }catch(e){msg.textContent='Ошибка сети или базы. Аккаунт не удалён.'}};
+ pn.append(w,cp,msg,E('button',{textContent:'Да, удалить навсегда',onclick:del}),' ',E('button',{textContent:'Отмена',onclick:renderEdit}))}
+function renderEdit(){pn.textContent='';pn.append(E('h3',{textContent:'✏️ Редактировать аккаунт'}));
+ const nn=inp('Новый ник'),cp=inp('Текущий пароль (обязательно)','password'),np=inp('Новый пароль (если нужно сменить)','password');
+ nn.value=ses.dn||ses.u;const msg=E('div');msg.style.cssText='min-height:20px;margin:6px 0;color:#d33';
+ const save=async()=>{const n=nn.value.trim(),nl=n.toLowerCase();
+  if(!/^[a-z0-9_а-яё]{3,16}$/i.test(n)){msg.textContent='Ник: 3–16 символов (буквы, цифры, _).';return}
+  if(np.value&&np.value.length<6){msg.textContent='Новый пароль от 6 символов.';return}
+  try{if(await hp(ses.u,cp.value)!==ses.h){msg.textContent='Неверный текущий пароль.';return}
+   const nh=await hp(nl,np.value||cp.value);
+   if(ses.local){const L=loc();if(nl!==ses.u&&L[nl]){msg.textContent='Такой ник уже занят.';return}
+    const ot=lh(L[ses.u]).t;delete L[ses.u];L[nl]={h:nh,dn:n,t:ot};localStorage.setItem('shoploc',JSON.stringify(L))}
+   else{const r=await rpc('acc_update',{u:ses.u,p:ses.h,nu:nl,np:nh});
+    if(r.err){msg.textContent=r.err=='taken'?'Такой ник уже занят.':r.err=='auth'?'Ошибка входа.':'Недопустимый ник.';return}}
+   ses={...ses,u:nl,h:nh,dn:n};localStorage.setItem('shopacc',JSON.stringify(ses));
+   if(!ses.local)await rpc('acc_save',{u:ses.u,p:ses.h,s:stats()}).catch(()=>{});
+   render();const ok=E('div',{textContent:'✅ Сохранено'});ok.style.color='#2a9d3f';pn.append(ok)
+  }catch(e){msg.textContent='Ошибка сети или базы. Изменения не сохранены.'}};
+ pn.append(nn,cp,np,msg,E('button',{textContent:'Сохранить',onclick:save}),' ',E('button',{textContent:'Назад',onclick:render}),E('hr'),Object.assign(E('button',{textContent:'🗑️ Удалить аккаунт',onclick:renderDel}),{style:'color:#d33'}))}
+const nk=E('div');nk.style.cssText='font-weight:bold;font-size:17px;margin:2px 0 4px;display:none;word-break:break-all';
+document.getElementById('pv').before(nk);
+function updateNick(){nk.textContent=ses?(ses.dn||ses.u):'';nk.style.display=ses?'block':'none'}updateNick();
+const ov2=E('div');ov2.style.cssText=ov.style.cssText;const pn2=E('div');pn2.style.cssText=pn.style.cssText;ov2.append(pn2);document.body.append(ov2);
+ov2.onclick=e=>{if(e.target===ov2)ov2.style.display='none'};
+const MODES=[['n','Обычный режим'],['h','Hard Mode'],['w','Хеллоуинский режим'],['k','Детский режим'],['d','Режим с дебафами (3 в минуту)'],['e','Режим с дебафами (10 на всю игру)'],['r','Уничтожь конкурентов']];
+let lastQ='';
+function iconCv(js,size){let sk=null;try{sk=typeof js=='string'?JSON.parse(js):js}catch(e){}
+ if(!(sk&&COLS.includes(sk.c)&&Number.isInteger(sk.e)&&sk.e>=0&&sk.e<EYES.length&&sk.e!=6&&sk.e!=8))sk={c:'#ffffff',e:0,m:true,g:null};
+ const r=size>40?4:2,c=document.createElement('canvas');c.width=c.height=32*r;c.style.cssText='width:'+size+'px;height:'+size+'px;flex:none';
+ const g=c.getContext('2d');g.scale(r,r);sq(g,2,2,sk.c,sk.e,sk.m!==false,COLS.includes(sk.g)?sk.g:null);return c}
+function renderP(name,idt,s,note){pn2.textContent='';
+ const top=E('div'),nm=E('div'),b1=E('b',{textContent:name});b1.style.fontSize='18px';nm.append(b1,E('div',{textContent:idt}));
+ top.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:8px';top.append(iconCv(s.skin,64),nm);pn2.append(top);
+ if(note){const n=E('div',{textContent:note});n.style.cssText='font-size:12px;opacity:.75;margin-bottom:6px';pn2.append(n)}
+ const r=s.rec||{},have=new Set(Array.isArray(s.ach)?s.ach:[]),box=E('div');box.style.marginTop='10px';let cur=null;
+ const bR=E('button',{textContent:'🏁 Рекорды'}),bA=E('button',{textContent:'🏆 Ачивки'});
+ const show=k=>{cur=cur==k?null:k;box.textContent='';bR.style.fontWeight=cur=='r'?'bold':'';bA.style.fontWeight=cur=='a'?'bold':'';
+  if(cur=='r')MODES.forEach(([m,l])=>{const d=E('div',{textContent:l+': '+(typeof r[m]=='number'&&r[m]>0?fT(r[m]):'—')});d.style.cssText='font-size:14px;margin:4px 0';box.append(d)});
+  if(cur=='a'){const L=ACHS.filter(a=>have.has(a.id));box.append(E('b',{textContent:'Выполнено: '+L.length+' из '+ACHS.length}));
+   if(!L.length)box.append(E('div',{textContent:'Пока нет выполненных ачивок.'}));
+   L.forEach(a=>{const d=E('div'),t=E('div'),n=E('b',{textContent:a.n}),ds=E('div',{textContent:a.d});d.style.cssText='display:flex;align-items:center;gap:8px;margin:6px 0';
+    n.style.color=LVC[a.lv];if(a.lv==1)n.style.textShadow='0 0 2px #000';ds.style.cssText='font-size:12px;opacity:.8';t.append(n,ds);
+    d.append(a.face<0?gradCv(28):faceCv(a.face,28),t);box.append(d)})}};
+ bR.onclick=()=>show('r');bA.onclick=()=>show('a');pn2.append(bR,' ',bA,box,
+  E('div',{},[E('br'),E('button',{textContent:'← К списку',onclick:renderS}),' ',E('button',{textContent:'Закрыть',onclick:()=>ov2.style.display='none'})]))}
+function renderS(){pn2.textContent='';pn2.append(E('h3',{textContent:'🔎 Поиск игрока'}));
+ const q=inp('Ник игрока (пусто — показать всех)'),info=E('div'),res=E('div');q.value=lastQ;info.style.cssText='font-size:13px;opacity:.8;margin:4px 0';pn2.append(q,info,res);let t,n_=0;
+ const card=(name,id,s,me,note)=>{const d=E('div'),h=E('div'),a=E('span',{textContent:name,onclick:()=>renderP(name,'ID: '+id,s,note)});
+  d.style.cssText='padding:8px;margin:4px 0;border:1px solid #8886;border-radius:8px';h.style.cssText='display:flex;align-items:center;gap:8px';
+  a.style.cssText='font-weight:bold;cursor:pointer;text-decoration:underline';
+  h.append(iconCv(s.skin,28),a,E('span',{textContent:'ID: '+id+(me?' · это вы':'')}));d.append(h);
+  const r=s.rec||{},nr=Object.values(r).filter(n=>n>0).length;d.append(E('div',{textContent:'🏆 Достижений: '+((s.ach||[]).length)+' · 🏁 Рекордов: '+nr+(r.n>0?' · Обычный: '+fT(r.n):'')}));res.append(d)};
+ const run=async()=>{const v=q.value.trim().toLowerCase(),k=++n_;res.textContent='';info.textContent='';
+  try{if(!ok_)throw 0;const L=await rpc('acc_search',{q:v});if(k!=n_)return;
+   info.textContent='🌐 Аккаунты на сайте. Нажмите на ник, чтобы открыть аккаунт. Чем меньше ID, тем выше в списке.';
+   if(!L.length)res.textContent='Никого не найдено.';
+   L.forEach(x=>{const s=x.s||{};card((typeof s.dn=='string'&&s.dn.toLowerCase()==x.u)?s.dn:x.u,x.i,s,ses&&!ses.local&&ses.u==x.u)})}
+  catch(e){if(k!=n_)return;const L=loc(),A=Object.keys(L).filter(u=>!v||u.includes(v)).sort((a,b)=>(lh(L[a]).t||0)-(lh(L[b]).t||0));
+   info.textContent='📴 Вы не на сайте: показаны только аккаунты, созданные на этом устройстве (ID: 0).';
+   if(!A.length)res.textContent='Локальных аккаунтов нет.';
+   A.forEach(u=>card(lh(L[u]).dn||u,0,stats(),ses&&ses.local&&ses.u==u,'Локальный аккаунт: показаны данные этого устройства.'))}};
+ q.oninput=()=>{lastQ=q.value;clearTimeout(t);t=setTimeout(run,350)};run();
+ pn2.append(E('div',{},[E('br'),E('button',{textContent:'Закрыть',onclick:()=>ov2.style.display='none'})]));setTimeout(()=>q.focus(),50)}
+const b=E('button',{textContent:'Войти в аккаунт',onclick:()=>{render();ov.style.display='flex'}});
+const alt=document.getElementById('altBtn').parentElement,hd=E('div',{textContent:'Аккаунт'});
+hd.style.cssText='border-top:1px solid #8886;margin-top:10px;padding-top:6px;font-size:12px;opacity:.7';
+const sbtn=E('button',{textContent:'🔎 Поиск игрока',onclick:()=>{renderS();ov2.style.display='flex'}});
+const rw=E('div',{className:'row'},[b]),rw2=E('div',{className:'row'},[sbtn]);alt.after(hd,rw,rw2);
+})();
+</script>
+</body></html>
