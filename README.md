@@ -987,7 +987,7 @@ function draw(){
 menuRender();
 </script><script>
 (()=>{
-const SUPA_URL='ВСТАВЬТЕ_PROJECT_URL',SUPA_KEY='ВСТАВЬТЕ_ANON_PUBLIC_KEY';
+const SUPA_URL='https://bjvnjscxhfmlyhpmpypw.supabase.co',SUPA_KEY='ВСТАВЬТЕ_ANON_PUBLIC_KEY';
 const ok_=!SUPA_URL.startsWith('ВСТАВЬТЕ')&&!SUPA_KEY.startsWith('ВСТАВЬТЕ');
 const BASE=SUPA_URL.trim().replace(/\/+$/,'').replace(/\/rest\/v1$/,''),KEY=SUPA_KEY.trim();
 const rpc=async(f,b)=>{const h={apikey:KEY,'Content-Type':'application/json'};if(!KEY.startsWith('sb_'))h.Authorization='Bearer '+KEY;
